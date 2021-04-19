@@ -18,9 +18,9 @@
 #include <cassert>
 #include <numeric>
 
+#include "GarbageCollection.h"
 #include "RuntimeCommon.h"
 #include "Shadow.h"
-#include "GarbageCollection.h"
 
 namespace {
 
@@ -161,6 +161,22 @@ SymExpr _sym_build_bswap(SymExpr expr) {
   size_t bits = _sym_bits_helper(expr);
   assert((bits % 16 == 0) && "bswap is not applicable");
   return _sym_build_extract(expr, 0, bits / 8, true);
+}
+
+SymExpr _sym_build_insert(SymExpr target, SymExpr to_insert, uint64_t offset,
+                          bool little_endian) {
+  size_t bitsToInsert = _sym_bits_helper(to_insert);
+  assert((bitsToInsert % 8 == 0) &&
+         "Expression to insert contains partial bytes");
+
+  SymExpr beforeInsert = _sym_build_extract(target, 0, offset, false);
+  SymExpr newPiece = little_endian ? _sym_build_bswap(to_insert) : to_insert;
+  SymExpr afterInsert = _sym_build_extract(
+      target, offset + (bitsToInsert / 8),
+      (_sym_bits_helper(target) / 8) - offset - (bitsToInsert / 8), false);
+
+  return _sym_concat_helper(beforeInsert,
+                            _sym_concat_helper(newPiece, afterInsert));
 }
 
 void _sym_register_expression_region(SymExpr *start, size_t length) {
