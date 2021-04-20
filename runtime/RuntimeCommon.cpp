@@ -169,11 +169,26 @@ SymExpr _sym_build_insert(SymExpr target, SymExpr to_insert, uint64_t offset,
   assert((bitsToInsert % 8 == 0) &&
          "Expression to insert contains partial bytes");
 
-  SymExpr beforeInsert = _sym_build_extract(target, 0, offset, false);
+  SymExpr beforeInsert =
+      (offset == 0) ? nullptr : _sym_build_extract(target, 0, offset, false);
   SymExpr newPiece = little_endian ? _sym_build_bswap(to_insert) : to_insert;
-  SymExpr afterInsert = _sym_build_extract(
-      target, offset + (bitsToInsert / 8),
-      (_sym_bits_helper(target) / 8) - offset - (bitsToInsert / 8), false);
+  uint64_t afterLen =
+      (_sym_bits_helper(target) / 8) - offset - (bitsToInsert / 8);
+  SymExpr afterInsert =
+      (afterLen == 0) ? nullptr
+                      : _sym_build_extract(target, offset + (bitsToInsert / 8),
+                                           afterLen, false);
+
+  SymExpr result = beforeInsert;
+  if (result == nullptr) {
+    result = newPiece;
+  } else {
+    result = _sym_concat_helper(result, newPiece);
+  }
+
+  if (afterInsert != nullptr) {
+    result = _sym_concat_helper(result, afterInsert);
+  }
 
   return _sym_concat_helper(beforeInsert,
                             _sym_concat_helper(newPiece, afterInsert));
