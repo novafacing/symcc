@@ -759,7 +759,7 @@ void Symbolizer::visitInsertValueInst(InsertValueInst &I) {
        {IRB.getInt64(aggregateMemberOffset(I.getAggregateOperand()->getType(),
                                            I.getIndices())),
         false},
-       {IRB.getInt8(isLittleEndian(I.getType()) ? 1 : 0), false}});
+       {IRB.getInt8(isLittleEndian(I.getInsertedValueOperand()->getType()) ? 1 : 0), false}});
   registerSymbolicComputation(insert, &I);
 }
 
