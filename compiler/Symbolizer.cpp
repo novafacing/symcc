@@ -759,7 +759,7 @@ void Symbolizer::visitInsertValueInst(InsertValueInst &I) {
        {IRB.getInt64(aggregateMemberOffset(I.getAggregateOperand()->getType(),
                                            I.getIndices())),
         false},
-       {IRB.getInt8(1), false}});
+       {IRB.getInt8(isLittleEndian(I.getType()) ? 1 : 0), false}});
   registerSymbolicComputation(insert, &I);
 }
 
@@ -772,7 +772,7 @@ void Symbolizer::visitExtractValueInst(ExtractValueInst &I) {
                                            I.getIndices())),
         false},
        {IRB.getInt64(dataLayout.getTypeStoreSize(I.getType())), false},
-       {IRB.getInt8(1), false}});
+       {IRB.getInt8(isLittleEndian(I.getType()) ? 1 : 0), false}});
   registerSymbolicComputation(extract, &I);
 }
 
