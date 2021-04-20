@@ -190,8 +190,7 @@ SymExpr _sym_build_insert(SymExpr target, SymExpr to_insert, uint64_t offset,
     result = _sym_concat_helper(result, afterInsert);
   }
 
-  return _sym_concat_helper(beforeInsert,
-                            _sym_concat_helper(newPiece, afterInsert));
+  return result;
 }
 
 void _sym_register_expression_region(SymExpr *start, size_t length) {
