@@ -26,6 +26,14 @@ RUN apt-get update \
         g++ \
         git \
         libz3-dev \
+	libtool-bin \
+	wget \
+	python \
+	automake \
+	autoconf \
+	bison \
+	flex \
+	libglib2.0-dev \
         llvm-10-dev \
         llvm-10-tools \
         ninja-build \
@@ -36,9 +44,13 @@ RUN apt-get update \
 RUN pip3 install lit
 
 # Build AFL.
-RUN git clone -b v2.56b https://github.com/google/AFL.git afl \
+RUN git clone https://github.com/novafacing/AFL.git afl \
     && cd afl \
-    && make
+    && git checkout symqemu-dockerfile-fix \
+    && git --no-pager log --decorate=short --pretty=oneline -n1 \
+    && make -j 15
+RUN cd /afl/qemu_mode \
+    && ./build_qemu_support.sh
 
 # Download the LLVM sources already so that we don't need to get them again when
 # SymCC changes
@@ -46,15 +58,6 @@ RUN git clone -b llvmorg-10.0.1 --depth 1 https://github.com/llvm/llvm-project.g
 
 # Build a version of SymCC with the simple backend to compile libc++
 COPY . /symcc_source
-
-# Init submodules if they are not initialiazed yet
-WORKDIR /symcc_source
-RUN if git submodule status | grep "^-">/dev/null ; then \
-    echo "Initializing submodules"; \
-    git submodule init; \
-    git submodule update; \
-    fi
-
 WORKDIR /symcc_build_simple
 RUN cmake -G Ninja \
         -DQSYM_BACKEND=OFF \
@@ -89,6 +92,27 @@ RUN export SYMCC_REGULAR_LIBCXX=yes SYMCC_NO_SYMBOLIC_INPUT=yes \
     && ninja distribution \
     && ninja install-distribution
 
+# Build SymQemu
+RUN cp /etc/apt/sources.list /etc/apt/sources.list~ && \
+    sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list && \
+    apt update
+RUN apt build-dep -y qemu
+RUN git clone https://github.com/eurecom-s3/symqemu.git /symqemu_source
+WORKDIR /symqemu_build
+RUN /symqemu_source/configure                                     \
+      --audio-drv-list=                                           \
+      --disable-bluez                                             \
+      --disable-sdl                                               \
+      --disable-gtk                                               \
+      --disable-vte                                               \
+      --disable-opengl                                            \
+      --disable-virglrenderer                                     \
+      --target-list=x86_64-linux-user                             \
+      --enable-capstone=git                                       \
+      --symcc-source=/symcc_source                                \
+      --symcc-build=/symcc_build                                  \
+    && make -j 15
+
 #
 # The final image
 #
@@ -101,6 +125,7 @@ RUN apt-get update \
         g++ \
         libllvm10 \
         zlib1g \
+        libglib2.0-dev \
         sudo \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -s /bin/bash ubuntu \
@@ -111,8 +136,10 @@ COPY --from=builder /root/.cargo/bin/symcc_fuzzing_helper /symcc_build/
 COPY util/pure_concolic_execution.sh /symcc_build/
 COPY --from=builder /libcxx_symcc_install /libcxx_symcc_install
 COPY --from=builder /afl /afl
+COPY --from=builder /symqemu_build /symqemu_build
 
 ENV PATH /symcc_build:$PATH
+ENV PATH /symqemu_build/x86_64-linux-user/:$PATH
 ENV AFL_PATH /afl
 ENV AFL_CC clang-10
 ENV AFL_CXX clang++-10
